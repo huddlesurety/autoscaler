@@ -1,0 +1,23 @@
+[env]
+_.file = [".env.json", ".env.local"]
+ENVIRONMENT = { required = "\"production\" | \"staging\"" }
+GOOGLE_APPLICATION_CREDENTIALS = "./google-credentials.json"
+
+[tools]
+"go" = "1.25.5"
+"github:railwayapp/cli" = "latest"
+
+# --- tasks ---
+[tasks.run]
+description = "Run the API server"
+run = """
+  go run ./cmd/job
+"""
+
+[tasks.env]
+description = "Download environment variables from Railway to .env"
+sources = [".env.local"]
+outputs = [".env.json"]
+run = """
+  railway variables --environment {{ env.ENVIRONMENT }} --service "Autoscaler" --json > .env.json
+"""
