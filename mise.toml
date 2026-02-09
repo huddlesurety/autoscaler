@@ -11,7 +11,7 @@ GOOGLE_APPLICATION_CREDENTIALS = "./google-credentials.json"
 [tasks.run]
 description = "Run the API server"
 run = """
-  go run ./cmd/job
+  go run ./cmd/autoscaler
 """
 
 [tasks.env]
