@@ -47,9 +47,17 @@ func run() error {
 
 	manager.Register(temporalMonitor, mockScaler)
 
-	manager.Run(ctx)
+	go manager.Run(ctx)
 
 	slog.Info("Manager started", slog.String("interval", fmt.Sprintf("%ds", cfg.IntervalSeconds)))
+
+	<-ctx.Done()
+
+	slog.Info("Autoscaler stopping")
+
+	stop()
+
+	slog.Info("Autoscaler stopped")
 
 	return nil
 }

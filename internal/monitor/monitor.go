@@ -76,7 +76,7 @@ loop:
 			slog.Info("Tick", slog.Int("success", success), slog.Int("failure", len(man.pairs)-success))
 			cancel()
 		case <-ctx.Done():
-			slog.Info("Stopping manager")
+			slog.Info("Manager stopping")
 			break loop
 		}
 	}
