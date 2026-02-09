@@ -1,7 +1,6 @@
 package main
 
 import (
-	"fmt"
 	"log/slog"
 	"os"
 	"time"
@@ -12,12 +11,12 @@ import (
 
 func main() {
 	if err := run(); err != nil {
-		slog.Error("Run failed", slog.Any("error", err))
+		slog.Error("Job failed", slog.Any("error", err))
 	}
 }
 
 func run() error {
-	fmt.Println("hello")
+	slog.Info("Job started")
 	return nil
 }
 
