@@ -3,8 +3,6 @@ module github.com/huddlesurety/autoscaler
 go 1.25.5
 
 require (
-	github.com/lmittmann/tint v1.1.3
-	github.com/mattn/go-isatty v0.0.20
 	github.com/spf13/viper v1.21.0
 	go.temporal.io/api v1.59.0
 	go.temporal.io/sdk v1.39.0

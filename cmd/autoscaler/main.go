@@ -67,13 +67,11 @@ func run() error {
 	return nil
 }
 
-// func init() {
-// 	lg := slog.New(
-// 		tint.NewHandler(os.Stdout, &tint.Options{
-// 			Level:      slog.LevelDebug,
-// 			NoColor:    !isatty.IsTerminal(os.Stdout.Fd()),
-// 			TimeFormat: time.Kitchen,
-// 		}),
-// 	)
-// 	slog.SetDefault(lg)
-// }
+func init() {
+	lg := slog.New(
+		slog.NewJSONHandler(os.Stdout, &slog.HandlerOptions{
+			Level: slog.LevelDebug,
+		}),
+	)
+	slog.SetDefault(lg)
+}
