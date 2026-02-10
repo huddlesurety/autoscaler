@@ -62,15 +62,14 @@ serviceInstance(serviceId: $serviceId, environmentId: $environmentId) {
 	return svc, nil
 }
 
-func (c *Client) Deploy(ctx context.Context, serviceID string) error {
-	query := `mutation serviceInstanceDeployV2($serviceId: String!, $environmentId: String!) {
-serviceInstanceDeployV2(serviceId: $serviceId, environmentId: $environmentId)
+func (c *Client) restartDeployment(ctx context.Context, deploymentID string) error {
+	query := `mutation deploymentRestart($id: String!) {
+deploymentRestart(id: $id)
 }`
 	body := &request{
 		Query: query,
 		Variables: map[string]any{
-			"serviceId":     serviceID,
-			"environmentId": c.environmentID,
+			"id": deploymentID,
 		},
 	}
 
@@ -83,21 +82,30 @@ serviceInstanceDeployV2(serviceId: $serviceId, environmentId: $environmentId)
 }
 
 func (c *Client) Scale(ctx context.Context, serviceID string, replicas int) error {
-	if replicas == 0 {
-		return c.scaleZero(ctx, serviceID)
+	svc, err := c.GetService(ctx, serviceID)
+	if err != nil {
+		return fmt.Errorf("failed to get service: %w", err)
 	}
-	return c.scaleNonZero(ctx, serviceID, replicas)
+
+	if replicas == 0 {
+		return c.scaleZero(ctx, svc)
+	}
+	return c.scaleNonZero(ctx, svc, replicas)
 }
 
 // scale by updating the instance config
-func (c *Client) scaleNonZero(ctx context.Context, serviceID string, replicas int) error {
+func (c *Client) scaleNonZero(ctx context.Context, svc *Service, replicas int) error {
+	if svc.Replicas == replicas {
+		return nil
+	}
+
 	query := `mutation serviceInstanceUpdate($serviceId: String!, $environmentId: String!, $input: ServiceInstanceUpdateInput!) {
 serviceInstanceUpdate(serviceId: $serviceId, environmentId: $environmentId, input: $input)
 }`
 	body := &request{
 		Query: query,
 		Variables: map[string]any{
-			"serviceId":     serviceID,
+			"serviceId":     svc.ID,
 			"environmentId": c.environmentID,
 			"input": map[string]any{
 				"numReplicas": replicas,
@@ -110,13 +118,9 @@ serviceInstanceUpdate(serviceId: $serviceId, environmentId: $environmentId, inpu
 		return fmt.Errorf("failed to execute request: %w", err)
 	}
 
-	svc, err := c.GetService(ctx, serviceID)
-	if err != nil {
-		return fmt.Errorf("failed to get service: %w", err)
-	}
-
+	// if previously scaled to zero, restart
 	if svc.Replicas == 0 {
-		if err := c.Deploy(ctx, serviceID); err != nil {
+		if err := c.restartDeployment(ctx, svc.LatestDeployment.ID); err != nil {
 			return fmt.Errorf("failed to deploy service: %w", err)
 		}
 	}
@@ -125,12 +129,7 @@ serviceInstanceUpdate(serviceId: $serviceId, environmentId: $environmentId, inpu
 }
 
 // scale by stopping the running deployment
-func (c *Client) scaleZero(ctx context.Context, serviceID string) error {
-	svc, err := c.GetService(ctx, serviceID)
-	if err != nil {
-		return fmt.Errorf("failed to get service: %w", err)
-	}
-
+func (c *Client) scaleZero(ctx context.Context, svc *Service) error {
 	if svc.Replicas == 0 {
 		return nil
 	}

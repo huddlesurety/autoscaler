@@ -7,12 +7,14 @@ ENVIRONMENT = { required = "\"production\" | \"staging\"" }
 "github:railwayapp/cli" = "latest"
 "aqua:mvdan/gofumpt" = "latest"
 "aqua:golangci/golangci-lint" = "latest"
+"aqua:jqlang/jq" = "latest"
+"go:github.com/thdxg/logfmt" = "latest"
 
 # --- tasks ---
 [tasks.run]
 description = "Run the API server"
 run = """
-  go run ./cmd/autoscaler
+  go run ./cmd/autoscaler 2>&1 | logfmt
 """
 
 [tasks.fmt]

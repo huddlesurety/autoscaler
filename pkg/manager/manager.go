@@ -148,23 +148,14 @@ func (man Manager) onTickScale(ctx context.Context) {
 				return
 			}
 
-			current, err := man.railway.GetService(ctx, p.target.ID)
-			if err != nil {
-				slog.Error("Failed to get service", slog.Any("error", err))
-				return
-			}
-
 			desired := p.scaler.Scale(avg)
-			skip := current.Replicas == desired
 
-			if !skip {
-				if err := man.railway.Scale(ctx, p.target.ID, desired); err != nil {
-					slog.Error("Failed to scale service",
-						slog.String("target", p.target.Name),
-						slog.Any("error", err),
-					)
-					return
-				}
+			if err := man.railway.Scale(ctx, p.target.ID, desired); err != nil {
+				slog.Error("Failed to scale service",
+					slog.String("target", p.target.Name),
+					slog.Any("error", err),
+				)
+				return
 			}
 
 			success.Add(1)
@@ -172,7 +163,6 @@ func (man Manager) onTickScale(ctx context.Context) {
 			slog.Debug("Service scaled",
 				slog.String("target", p.target.Name),
 				slog.Int("replicas", desired),
-				slog.Bool("skip", skip),
 			)
 		})
 	}
