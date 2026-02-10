@@ -7,12 +7,9 @@ import (
 	"os"
 	"os/signal"
 	"syscall"
-	"time"
 
 	"github.com/huddlesurety/autoscaler/internal/config"
 	"github.com/huddlesurety/autoscaler/pkg/manager"
-	"github.com/lmittmann/tint"
-	"github.com/mattn/go-isatty"
 )
 
 func main() {
@@ -70,13 +67,13 @@ func run() error {
 	return nil
 }
 
-func init() {
-	lg := slog.New(
-		tint.NewHandler(os.Stdout, &tint.Options{
-			Level:      slog.LevelDebug,
-			NoColor:    !isatty.IsTerminal(os.Stdout.Fd()),
-			TimeFormat: time.Kitchen,
-		}),
-	)
-	slog.SetDefault(lg)
-}
+// func init() {
+// 	lg := slog.New(
+// 		tint.NewHandler(os.Stdout, &tint.Options{
+// 			Level:      slog.LevelDebug,
+// 			NoColor:    !isatty.IsTerminal(os.Stdout.Fd()),
+// 			TimeFormat: time.Kitchen,
+// 		}),
+// 	)
+// 	slog.SetDefault(lg)
+// }
