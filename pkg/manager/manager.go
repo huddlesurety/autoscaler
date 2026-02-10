@@ -32,7 +32,7 @@ func New(cfg *Config) (*Manager, error) {
 
 	rc, err := railway.NewClient(cfg.RailwayEnvironmentID, cfg.RailwayToken)
 	if err != nil {
-		return nil, fmt.Errorf("failed to initialize Railway client")
+		return nil, fmt.Errorf("failed to initialize Railway client: %w", err)
 	}
 
 	return &Manager{
@@ -98,10 +98,13 @@ func (man *Manager) onTickMetric(ctx context.Context) {
 				)
 				return
 			}
-			p.metricMu.Lock()
-			p.metricCount++
-			p.metricSum += metric
-			p.metricMu.Unlock()
+			func() {
+				p.metricMu.Lock()
+				defer p.metricMu.Unlock()
+				p.metricCount++
+				p.metricSum += metric
+			}()
+
 			success.Add(1)
 
 			slog.Debug("Metric fetched",
@@ -127,18 +130,23 @@ func (man Manager) onTickScale(ctx context.Context) {
 	var wg sync.WaitGroup
 	for _, p := range man.pairs {
 		wg.Go(func() {
-			p.metricMu.Lock()
-			if p.metricCount == 0 {
+			avg, ok := func() (float64, bool) {
+				p.metricMu.Lock()
+				defer p.metricMu.Unlock()
+				if p.metricCount == 0 {
+					return 0, false
+				}
+				avg := p.metricSum / float64(p.metricCount)
+				p.metricSum = 0
+				p.metricCount = 0
+				return avg, true
+			}()
+			if !ok {
 				slog.Warn("No metrics collected, skipping scale",
 					slog.String("target", p.target.Name),
 				)
-				p.metricMu.Unlock()
 				return
 			}
-			avg := p.metricSum / float64(p.metricCount)
-			p.metricSum = 0
-			p.metricCount = 0
-			p.metricMu.Unlock()
 
 			current, err := man.railway.GetService(ctx, p.target.ID)
 			if err != nil {

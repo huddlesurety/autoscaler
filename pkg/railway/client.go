@@ -13,6 +13,8 @@ type Client struct {
 func NewClient(environmentID, token string) (*Client, error) {
 	c := new(http.Client)
 	return &Client{
-		client: c,
+		client:        c,
+		environmentID: environmentID,
+		token:         token,
 	}, nil
 }

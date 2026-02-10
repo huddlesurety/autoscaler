@@ -24,7 +24,8 @@ func newScalers(cfg *config.Config) (*scalers, error) {
 	rag := scalerimpl.NewRAGScaler(cfg, tc)
 
 	return &scalers{
-		rag: rag,
+		rag:      rag,
+		temporal: tc,
 	}, nil
 }
 

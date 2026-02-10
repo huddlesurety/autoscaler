@@ -32,7 +32,7 @@ func run() error {
 		return fmt.Errorf("failed to initialize config: %w", err)
 	}
 
-	manager, err := manager.New(&manager.Config{
+	man, err := manager.New(&manager.Config{
 		RailwayEnvironmentID: cfg.Railway.EnvironmentID,
 		RailwayToken:         cfg.Railway.Token,
 		MetricInterval:       cfg.MetricInterval,
@@ -48,13 +48,18 @@ func run() error {
 	}
 	defer scalers.close()
 
-	if err := manager.Register(ctx, cfg.Railway.ServiceRAG, scalers.rag); err != nil {
+	if err := man.Register(ctx, cfg.Railway.ServiceRAG, scalers.rag); err != nil {
 		return fmt.Errorf("failed to register RAG scaler: %w", err)
 	}
 
-	go manager.Run(ctx)
+	go man.Run(ctx)
 
-	slog.Info("Manager started", slog.String("interval", cfg.MetricInterval.String()))
+	slog.Info("Manager started",
+		slog.Group("interval",
+			slog.String("metric", cfg.MetricInterval.String()),
+			slog.String("scale", cfg.ScaleInterval.String()),
+		),
+	)
 
 	<-ctx.Done()
 	stop()

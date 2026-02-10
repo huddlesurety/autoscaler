@@ -38,6 +38,7 @@ func (c *Client) request(ctx context.Context, reqBody *request, data any) error 
 	if err != nil {
 		return fmt.Errorf("failed to execute request: %w", err)
 	}
+	// nolint:errcheck
 	defer res.Body.Close()
 
 	resBody, err := io.ReadAll(res.Body)
