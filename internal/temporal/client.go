@@ -28,13 +28,17 @@ func NewClient(cfg *config.Config) (*Client, error) {
 	}, nil
 }
 
-func (c *Client) GetWorkflowCount(ctx context.Context, query string) (int, error) {
-	resp, err := c.client.ListWorkflow(ctx, &workflowservice.ListWorkflowExecutionsRequest{
+func (c *Client) GetWorkflowCount(ctx context.Context, query string) (int64, error) {
+	resp, err := c.client.CountWorkflow(ctx, &workflowservice.CountWorkflowExecutionsRequest{
 		Query: query,
 	})
 	if err != nil {
-		return -1, fmt.Errorf("failed to list open workflows: %w", err)
+		return -1, fmt.Errorf("failed to count workflows: %w", err)
 	}
 
-	return len(resp.Executions), nil
+	return resp.Count, nil
+}
+
+func (c *Client) Close() {
+	c.client.Close()
 }

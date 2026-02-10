@@ -11,17 +11,23 @@ import (
 
 type scalers struct {
 	rag scaler.Scaler
+
+	temporal *temporal.Client
 }
 
 func newScalers(cfg *config.Config) (*scalers, error) {
-	temporal, err := temporal.NewClient(cfg)
+	tc, err := temporal.NewClient(cfg)
 	if err != nil {
 		return nil, fmt.Errorf("failed to initialize Temporal client: %w", err)
 	}
 
-	rag, err := scalerimpl.NewRAGScaler(cfg, temporal)
+	rag := scalerimpl.NewRAGScaler(cfg, tc)
 
 	return &scalers{
 		rag: rag,
 	}, nil
+}
+
+func (s *scalers) close() {
+	s.temporal.Close()
 }

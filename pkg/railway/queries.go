@@ -39,7 +39,7 @@ serviceInstance(serviceId: $serviceId, environmentId: $environmentId) {
 		Query: query,
 		Variables: map[string]any{
 			"serviceId":     serviceID,
-			"environmentId": c.cfg.Railway.EnvironmentID,
+			"environmentId": c.environmentID,
 		},
 	}
 
@@ -70,7 +70,7 @@ serviceInstanceDeployV2(serviceId: $serviceId, environmentId: $environmentId)
 		Query: query,
 		Variables: map[string]any{
 			"serviceId":     serviceID,
-			"environmentId": c.cfg.Railway.EnvironmentID,
+			"environmentId": c.environmentID,
 		},
 	}
 
@@ -98,7 +98,7 @@ serviceInstanceUpdate(serviceId: $serviceId, environmentId: $environmentId, inpu
 		Query: query,
 		Variables: map[string]any{
 			"serviceId":     serviceID,
-			"environmentId": c.cfg.Railway.EnvironmentID,
+			"environmentId": c.environmentID,
 			"input": map[string]any{
 				"numReplicas": replicas,
 			},

@@ -8,13 +8,12 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/huddlesurety/autoscaler/internal/config"
 	"github.com/huddlesurety/autoscaler/pkg/railway"
 	scaler "github.com/huddlesurety/autoscaler/pkg/scaler"
 )
 
 type Manager struct {
-	cfg     *config.Config
+	cfg     *Config
 	railway *railway.Client
 	pairs   []*serviceScaler
 }
@@ -28,10 +27,10 @@ type serviceScaler struct {
 	metricCount int
 }
 
-func New(cfg *config.Config) (*Manager, error) {
+func New(cfg *Config) (*Manager, error) {
 	scalers := make([]*serviceScaler, 0)
 
-	rc, err := railway.NewClient(cfg)
+	rc, err := railway.NewClient(cfg.RailwayEnvironmentID, cfg.RailwayToken)
 	if err != nil {
 		return nil, fmt.Errorf("failed to initialize Railway client")
 	}
@@ -43,7 +42,7 @@ func New(cfg *config.Config) (*Manager, error) {
 	}, nil
 }
 
-// Pairs the given monitor and controller by feeding the metric from the monitor to the scaler
+// Pairs the given service and scaler
 func (man *Manager) Register(ctx context.Context, serviceID string, s scaler.Scaler) error {
 	svc, err := man.railway.GetService(ctx, serviceID)
 	if err != nil {
@@ -64,7 +63,7 @@ func (man *Manager) Register(ctx context.Context, serviceID string, s scaler.Sca
 	return nil
 }
 
-// Runs the manager loop indefinitely. Executes the regiestered monitors and tickers on tick.
+// Runs the manager loop until the context is canceled. Executes the registered scalers based on the configured interval.
 func (man *Manager) Run(ctx context.Context) {
 	metricTicker := time.NewTicker(man.cfg.MetricInterval)
 	scaleticker := time.NewTicker(man.cfg.ScaleInterval)
@@ -129,7 +128,10 @@ func (man Manager) onTickScale(ctx context.Context) {
 	for _, p := range man.pairs {
 		wg.Go(func() {
 			p.metricMu.Lock()
-			avg := p.metricSum / float64(p.metricCount)
+			avg := 0.0
+			if p.metricCount > 0 {
+				avg = p.metricSum / float64(p.metricCount)
+			}
 			p.metricSum = 0
 			p.metricCount = 0
 			p.metricMu.Unlock()

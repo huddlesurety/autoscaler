@@ -2,19 +2,17 @@ package railway
 
 import (
 	"net/http"
-
-	"github.com/huddlesurety/autoscaler/internal/config"
 )
 
 type Client struct {
-	cfg    *config.Config
-	client *http.Client
+	client        *http.Client
+	environmentID string
+	token         string
 }
 
-func NewClient(cfg *config.Config) (*Client, error) {
+func NewClient(environmentID, token string) (*Client, error) {
 	c := new(http.Client)
 	return &Client{
-		cfg:    cfg,
 		client: c,
 	}, nil
 }

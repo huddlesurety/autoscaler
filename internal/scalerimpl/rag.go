@@ -15,14 +15,14 @@ type RAGScaler struct {
 	workflowsQuery string
 }
 
-func NewRAGScaler(cfg *config.Config, temporal *temporal.Client) (scaler.Scaler, error) {
+func NewRAGScaler(cfg *config.Config, tc *temporal.Client) scaler.Scaler {
 	wq := fmt.Sprintf("ExecutionStatus = '%s' and TaskQueue = '%s'", "Running", cfg.Temporal.TaskQueueRAG)
 
 	return &RAGScaler{
 		serviceID:      cfg.Railway.ServiceRAG,
-		temporal:       temporal,
+		temporal:       tc,
 		workflowsQuery: wq,
-	}, nil
+	}
 }
 
 func (m RAGScaler) ServiceID() string {
@@ -44,7 +44,7 @@ func (m RAGScaler) Scale(avg float64) int {
 		return 0
 	case 0 < avg && avg <= 10:
 		return 1
-	case 10 < avg && avg < 20:
+	case 10 < avg && avg <= 20:
 		return 2
 	default:
 		return 3
