@@ -9,7 +9,7 @@ import (
 	"time"
 
 	"github.com/huddlesurety/autoscaler/pkg/railway"
-	scaler "github.com/huddlesurety/autoscaler/pkg/scaler"
+	"github.com/huddlesurety/autoscaler/pkg/scaler"
 )
 
 type Manager struct {
@@ -128,10 +128,14 @@ func (man Manager) onTickScale(ctx context.Context) {
 	for _, p := range man.pairs {
 		wg.Go(func() {
 			p.metricMu.Lock()
-			avg := 0.0
-			if p.metricCount > 0 {
-				avg = p.metricSum / float64(p.metricCount)
+			if p.metricCount == 0 {
+				slog.Warn("No metrics collected, skipping scale",
+					slog.String("target", p.target.Name),
+				)
+				p.metricMu.Unlock()
+				return
 			}
+			avg := p.metricSum / float64(p.metricCount)
 			p.metricSum = 0
 			p.metricCount = 0
 			p.metricMu.Unlock()
