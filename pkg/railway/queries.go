@@ -124,7 +124,7 @@ serviceInstanceUpdate(serviceId: $serviceId, environmentId: $environmentId, inpu
 	return nil
 }
 
-// scale by removing the running deployment
+// scale by stopping the running deployment
 func (c *Client) scaleZero(ctx context.Context, serviceID string) error {
 	svc, err := c.GetService(ctx, serviceID)
 	if err != nil {
@@ -135,8 +135,8 @@ func (c *Client) scaleZero(ctx context.Context, serviceID string) error {
 		return nil
 	}
 
-	query := `mutation deploymentRemove($id: String!) {
-deploymentRemove(id: $id)
+	query := `mutation deploymentStop($id: String!) {
+deploymentStop(id: $id)
 }`
 	body := &request{
 		Query: query,
