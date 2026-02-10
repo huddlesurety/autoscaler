@@ -37,23 +37,18 @@ func run() error {
 		return fmt.Errorf("failed to initialize monitor manager: %w", err)
 	}
 
-	monitors, err := newMonitors(cfg)
+	scalers, err := newScalers(cfg)
 	if err != nil {
 		return fmt.Errorf("failed to initialize monitors: %w", err)
 	}
 
-	controllers, err := newControllers(cfg)
-	if err != nil {
-		return fmt.Errorf("failed to initialize monitors: %w", err)
+	if err := manager.Register(ctx, cfg.Railway.ServiceRAG, scalers.rag); err != nil {
+		return fmt.Errorf("failed to register RAG scaler: %w", err)
 	}
-
-	manager.Register(cfg.Railway.ServiceRAG, monitors.Temporal, controllers.rag)
-	manager.Register(cfg.Railway.ServiceAPI, monitors.Mock, controllers.api)
-	manager.Register(cfg.Railway.ServiceApp, monitors.Mock, controllers.app)
 
 	go manager.Run(ctx)
 
-	slog.Info("Manager started", slog.String("interval", cfg.Interval.String()))
+	slog.Info("Manager started", slog.String("interval", cfg.MetricInterval.String()))
 
 	<-ctx.Done()
 	stop()
@@ -66,7 +61,7 @@ func run() error {
 func init() {
 	lg := slog.New(
 		tint.NewHandler(os.Stdout, &tint.Options{
-			Level:      slog.LevelInfo,
+			Level:      slog.LevelDebug,
 			NoColor:    !isatty.IsTerminal(os.Stdout.Fd()),
 			TimeFormat: time.Kitchen,
 		}),

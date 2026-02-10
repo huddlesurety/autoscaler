@@ -5,30 +5,31 @@ import (
 	"fmt"
 	"log/slog"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/huddlesurety/autoscaler/internal/config"
-	"github.com/huddlesurety/autoscaler/pkg/monitor"
 	"github.com/huddlesurety/autoscaler/pkg/railway"
+	scaler "github.com/huddlesurety/autoscaler/pkg/scaler"
 )
 
 type Manager struct {
 	cfg     *config.Config
 	railway *railway.Client
-	scalers []scaler
+	pairs   []*serviceScaler
 }
 
-// Based on the metric, determines the desired replicas
-type ControllerFunc func(ctx context.Context, metric int) (desired int, err error)
+type serviceScaler struct {
+	target *railway.Service
+	scaler scaler.Scaler
 
-type scaler struct {
-	serviceID string
-	monitor   monitor.Monitor
-	control   ControllerFunc
+	metricMu    sync.Mutex
+	metricSum   float64
+	metricCount int
 }
 
 func New(cfg *config.Config) (*Manager, error) {
-	scalers := make([]scaler, 0)
+	scalers := make([]*serviceScaler, 0)
 
 	rc, err := railway.NewClient(cfg)
 	if err != nil {
@@ -38,26 +39,43 @@ func New(cfg *config.Config) (*Manager, error) {
 	return &Manager{
 		cfg:     cfg,
 		railway: rc,
-		scalers: scalers,
+		pairs:   scalers,
 	}, nil
 }
 
 // Pairs the given monitor and controller by feeding the metric from the monitor to the scaler
-func (man *Manager) Register(serviceID string, m monitor.Monitor, control ControllerFunc) {
-	man.scalers = append(man.scalers, scaler{serviceID, m, control})
+func (man *Manager) Register(ctx context.Context, serviceID string, s scaler.Scaler) error {
+	svc, err := man.railway.GetService(ctx, serviceID)
+	if err != nil {
+		return fmt.Errorf("failed to get service: %w", err)
+	}
+
+	man.pairs = append(man.pairs, &serviceScaler{
+		target:      svc,
+		scaler:      s,
+		metricSum:   0,
+		metricCount: 0,
+	})
+
+	slog.Debug("Scaler registered",
+		slog.Group("target", slog.String("id", svc.ID), slog.String("name", svc.Name)),
+	)
+
+	return nil
 }
 
 // Runs the manager loop indefinitely. Executes the regiestered monitors and tickers on tick.
 func (man *Manager) Run(ctx context.Context) {
-	ticker := time.NewTicker(man.cfg.Interval)
-	tickID := 0
+	metricTicker := time.NewTicker(man.cfg.MetricInterval)
+	scaleticker := time.NewTicker(man.cfg.ScaleInterval)
 
 loop:
 	for {
 		select {
-		case <-ticker.C:
-			man.onTick(ctx, tickID)
-			tickID++
+		case <-metricTicker.C:
+			man.onTickMetric(ctx)
+		case <-scaleticker.C:
+			man.onTickScale(ctx)
 		case <-ctx.Done():
 			slog.Info("Manager stopping")
 			break loop
@@ -65,77 +83,89 @@ loop:
 	}
 }
 
-func (man *Manager) onTick(ctx context.Context, tickID int) {
-	success := 0
-	ctx, cancel := context.WithTimeout(ctx, man.cfg.Interval)
+func (man *Manager) onTickMetric(ctx context.Context) {
+	var success atomic.Int64
+	ctx, cancel := context.WithTimeout(ctx, man.cfg.MetricInterval)
 
 	var wg sync.WaitGroup
-	for _, s := range man.scalers {
+	for _, p := range man.pairs {
 		wg.Go(func() {
-			before, err := man.railway.GetService(ctx, s.serviceID)
+			metric, err := p.scaler.GetMetric(ctx)
 			if err != nil {
-				slog.Error("Failed to get service", slog.Any("error", err))
-				return
-			}
-
-			attrService := slog.String("service", before.Name)
-			attrMonitor := slog.String("monitor", s.monitor.Name())
-
-			metric, err := s.monitor.OnTick(ctx, tickID)
-			if err != nil {
-				slog.Error("Failed to retrieve metric",
-					attrService,
-					attrMonitor,
+				slog.Error("Failed to fetch metric",
+					slog.String("target", p.target.Name),
 					slog.Any("error", err),
 				)
 				return
 			}
+			p.metricMu.Lock()
+			p.metricCount++
+			p.metricSum += metric
+			p.metricMu.Unlock()
+			success.Add(1)
 
-			desired, err := s.control(ctx, metric)
-			if err != nil {
-				slog.Error("Failed to get desired replicas",
-					attrService,
-					attrMonitor,
-					slog.Any("error", err),
-				)
-				return
-			}
-
-			if err := man.railway.Scale(ctx, s.serviceID, desired); err != nil {
-				slog.Error("Failed to scale",
-					attrService,
-					attrMonitor,
-					slog.Any("error", err),
-				)
-				return
-			}
-
-			after, err := man.railway.GetService(ctx, s.serviceID)
-			if err != nil {
-				slog.Error("Failed to get service", slog.Any("error", err))
-				return
-			}
-
-			attrReplicasBefore := slog.Int("before", before.Replicas)
-			attrReplicasAfter := slog.Int("after", after.Replicas)
-
-			slog.Info("Scaled successfully",
-				attrService,
-				attrMonitor,
-				attrReplicasBefore,
-				attrReplicasAfter,
-				slog.Int("desired", desired),
+			slog.Debug("Metric fetched",
+				slog.String("target", p.target.Name),
+				slog.Float64("value", metric),
 			)
 		})
-		success++
 	}
 
 	wg.Wait()
 
-	slog.Info("Tick",
-		slog.Int("id", tickID),
-		slog.Int("success", success),
-		slog.Int("failure", len(man.scalers)-success),
+	slog.Info("Tick metric",
+		slog.Int64("success", success.Load()),
+		slog.Int("total", len(man.pairs)),
 	)
+
+	cancel()
+}
+
+func (man Manager) onTickScale(ctx context.Context) {
+	var success atomic.Int64
+	ctx, cancel := context.WithTimeout(ctx, man.cfg.ScaleInterval)
+
+	var wg sync.WaitGroup
+	for _, p := range man.pairs {
+		wg.Go(func() {
+			p.metricMu.Lock()
+			avg := p.metricSum / float64(p.metricCount)
+			p.metricSum = 0
+			p.metricCount = 0
+			p.metricMu.Unlock()
+
+			desired := p.scaler.Scale(avg)
+
+			if err := man.railway.Scale(ctx, p.target.ID, desired); err != nil {
+				slog.Error("Failed to scale service",
+					slog.String("target", p.target.Name),
+					slog.Any("error", err),
+				)
+				return
+			}
+
+			current, err := man.railway.GetService(ctx, p.target.ID)
+			if err != nil {
+				slog.Error("Failed to get service", slog.Any("error", err))
+				return
+			}
+
+			success.Add(1)
+
+			slog.Debug("Service scaled",
+				slog.String("target", p.target.Name),
+				slog.Int("current", current.Replicas),
+				slog.Int("desired", desired),
+			)
+		})
+	}
+
+	wg.Wait()
+
+	slog.Info("Tick scale",
+		slog.Int64("success", success.Load()),
+		slog.Int("total", len(man.pairs)),
+	)
+
 	cancel()
 }

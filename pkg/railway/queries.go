@@ -6,7 +6,7 @@ import (
 )
 
 type Service struct {
-	ID               string `json:"id"`
+	ID               string
 	Name             string `json:"serviceName"`
 	Replicas         int    `json:"numReplicas"`
 	LatestDeployment struct {
@@ -53,11 +53,33 @@ serviceInstance(serviceId: $serviceId, environmentId: $environmentId) {
 		return nil, fmt.Errorf("failed to execute request: %w", err)
 	}
 
-	if res.Data.Service.LatestDeployment.ID == "" {
-		res.Data.Service.Replicas = 0
+	svc := &res.Data.Service
+	svc.ID = serviceID
+	if svc.LatestDeployment.ID == "" {
+		svc.Replicas = 0
 	}
 
-	return &res.Data.Service, nil
+	return svc, nil
+}
+
+func (c *Client) Deploy(ctx context.Context, serviceID string) error {
+	query := `mutation serviceInstanceDeployV2($serviceId: String!, $environmentId: String!) {
+serviceInstanceDeployV2(serviceId: $serviceId, environmentId: $environmentId)
+}`
+	body := &request{
+		Query: query,
+		Variables: map[string]any{
+			"serviceId":     serviceID,
+			"environmentId": c.cfg.Railway.EnvironmentID,
+		},
+	}
+
+	var res any
+	if err := c.request(ctx, body, &res); err != nil {
+		return fmt.Errorf("failed to execute request: %w", err)
+	}
+
+	return nil
 }
 
 func (c *Client) Scale(ctx context.Context, serviceID string, replicas int) error {
@@ -86,6 +108,17 @@ serviceInstanceUpdate(serviceId: $serviceId, environmentId: $environmentId, inpu
 	var res any
 	if err := c.request(ctx, body, &res); err != nil {
 		return fmt.Errorf("failed to execute request: %w", err)
+	}
+
+	svc, err := c.GetService(ctx, serviceID)
+	if err != nil {
+		return fmt.Errorf("failed to get service: %w", err)
+	}
+
+	if svc.Replicas == 0 {
+		if err := c.Deploy(ctx, serviceID); err != nil {
+			return fmt.Errorf("failed to deploy service: %w", err)
+		}
 	}
 
 	return nil
