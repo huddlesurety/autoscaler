@@ -10,5 +10,5 @@ type Monitor interface {
 
 	// OnTick runs every time the monitor timer ticks.
 	// It returns a single metric that indicates the resource load
-	OnTick(ctx context.Context) (int, error)
+	OnTick(ctx context.Context, tickID int) (int, error)
 }

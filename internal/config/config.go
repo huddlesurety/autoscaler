@@ -4,13 +4,18 @@ import (
 	"fmt"
 	"reflect"
 	"strings"
+	"time"
 
 	"github.com/spf13/viper"
 )
 
 type Config struct {
-	IntervalSeconds int            `mapstructure:"INTERVAL_SECONDS"`
-	Temporal        TemporalConfig `mapstructure:"TEMPORAL"`
+	IntervalSecs int `mapstructure:"INTERVAL_SECS"`
+
+	Railway  RailwayConfig  `mapstructure:"RAILWAY"`
+	Temporal TemporalConfig `mapstructure:"TEMPORAL"`
+
+	Interval time.Duration
 }
 
 func New() (*Config, error) {
@@ -22,6 +27,8 @@ func New() (*Config, error) {
 	if err := v.Unmarshal(&cfg); err != nil {
 		return nil, fmt.Errorf("failed to unmarshal environment config: %w", err)
 	}
+
+	cfg.Interval = time.Second * time.Duration(cfg.IntervalSecs)
 
 	if err := cfg.validate(); err != nil {
 		return nil, fmt.Errorf("failed to validate config: %w", err)

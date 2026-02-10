@@ -1,7 +1,6 @@
 [env]
 _.file = [".env.json", ".env.local"]
 ENVIRONMENT = { required = "\"production\" | \"staging\"" }
-GOOGLE_APPLICATION_CREDENTIALS = "./google-credentials.json"
 
 [tools]
 "go" = "1.25.5"

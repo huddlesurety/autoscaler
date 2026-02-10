@@ -10,8 +10,7 @@ import (
 	"time"
 
 	"github.com/huddlesurety/autoscaler/internal/config"
-	"github.com/huddlesurety/autoscaler/internal/monitor"
-	"github.com/huddlesurety/autoscaler/internal/scaler"
+	"github.com/huddlesurety/autoscaler/pkg/manager"
 	"github.com/lmittmann/tint"
 	"github.com/mattn/go-isatty"
 )
@@ -23,6 +22,8 @@ func main() {
 }
 
 func run() error {
+	slog.Info("Autoscaler started")
+
 	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 	defer stop()
 
@@ -31,30 +32,30 @@ func run() error {
 		return fmt.Errorf("failed to initialize config: %w", err)
 	}
 
-	slog.Info("Autoscaler started")
-
-	manager, err := monitor.NewManager(cfg)
+	manager, err := manager.New(cfg)
 	if err != nil {
-		return fmt.Errorf("failed to initialize monitor manager")
+		return fmt.Errorf("failed to initialize monitor manager: %w", err)
 	}
 
-	temporalMonitor, err := monitor.NewTemporalMonitor(cfg)
+	monitors, err := newMonitors(cfg)
 	if err != nil {
-		return fmt.Errorf("failed to initialize Temporal monitor")
+		return fmt.Errorf("failed to initialize monitors: %w", err)
 	}
 
-	mockScaler := scaler.NewMockScaler()
+	controllers, err := newControllers(cfg)
+	if err != nil {
+		return fmt.Errorf("failed to initialize monitors: %w", err)
+	}
 
-	manager.Register(temporalMonitor, mockScaler)
+	manager.Register(cfg.Railway.ServiceRAG, monitors.Temporal, controllers.rag)
+	manager.Register(cfg.Railway.ServiceAPI, monitors.Mock, controllers.api)
+	manager.Register(cfg.Railway.ServiceApp, monitors.Mock, controllers.app)
 
 	go manager.Run(ctx)
 
-	slog.Info("Manager started", slog.String("interval", fmt.Sprintf("%ds", cfg.IntervalSeconds)))
+	slog.Info("Manager started", slog.String("interval", cfg.Interval.String()))
 
 	<-ctx.Done()
-
-	slog.Info("Autoscaler stopping")
-
 	stop()
 
 	slog.Info("Autoscaler stopped")
