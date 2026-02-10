@@ -1,9 +1,7 @@
 package config
 
 type RailwayConfig struct {
-	Endpoint string `mapstructure:"ENDPOINT"`
-	Token    string `mapstructure:"API_TOKEN"`
-
+	Token         string `mapstructure:"API_TOKEN"`
 	EnvironmentID string `mapstructure:"ENVIRONMENT_ID"`
 
 	ServiceRAG string `mapstructure:"SERVICE_RAG"`

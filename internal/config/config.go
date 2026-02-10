@@ -10,10 +10,10 @@ import (
 )
 
 type Config struct {
-	MetricIntervalSecs int `mapstructure:"METRIC_INTERVAL_SECS"`
-	MetricInterval     time.Duration
-	ScaleIntervalSecs  int `mapstructure:"SCALE_INTERVAL_SECS"`
-	ScaleInterval      time.Duration
+	IntervalMetricSecs int `mapstructure:"INTERVAL_METRIC_SECS"`
+	IntervalMetric     time.Duration
+	IntervalScaleSecs  int `mapstructure:"INTERVAL_SCALE_SECS"`
+	IntervalScale      time.Duration
 
 	Railway  RailwayConfig  `mapstructure:"RAILWAY"`
 	Temporal TemporalConfig `mapstructure:"TEMPORAL"`
@@ -29,8 +29,8 @@ func New() (*Config, error) {
 		return nil, fmt.Errorf("failed to unmarshal environment config: %w", err)
 	}
 
-	cfg.MetricInterval = time.Second * time.Duration(cfg.MetricIntervalSecs)
-	cfg.ScaleInterval = time.Second * time.Duration(cfg.ScaleIntervalSecs)
+	cfg.IntervalMetric = time.Second * time.Duration(cfg.IntervalMetricSecs)
+	cfg.IntervalScale = time.Second * time.Duration(cfg.IntervalScaleSecs)
 
 	if err := cfg.validate(); err != nil {
 		return nil, fmt.Errorf("failed to validate config: %w", err)

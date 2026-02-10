@@ -18,6 +18,7 @@ import (
 func main() {
 	if err := run(); err != nil {
 		slog.Error("Autoscaler failed", slog.Any("error", err))
+		os.Exit(1)
 	}
 }
 
@@ -35,8 +36,8 @@ func run() error {
 	man, err := manager.New(&manager.Config{
 		RailwayEnvironmentID: cfg.Railway.EnvironmentID,
 		RailwayToken:         cfg.Railway.Token,
-		MetricInterval:       cfg.MetricInterval,
-		ScaleInterval:        cfg.ScaleInterval,
+		MetricInterval:       cfg.IntervalMetric,
+		ScaleInterval:        cfg.IntervalScale,
 	})
 	if err != nil {
 		return fmt.Errorf("failed to initialize manager: %w", err)
@@ -56,8 +57,8 @@ func run() error {
 
 	slog.Info("Manager started",
 		slog.Group("interval",
-			slog.String("metric", cfg.MetricInterval.String()),
-			slog.String("scale", cfg.ScaleInterval.String()),
+			slog.String("metric", cfg.IntervalMetric.String()),
+			slog.String("scale", cfg.IntervalScale.String()),
 		),
 	)
 
