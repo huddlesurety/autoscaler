@@ -32,28 +32,34 @@ func run() error {
 		return fmt.Errorf("failed to initialize config: %w", err)
 	}
 
-	manager, err := manager.New(cfg)
+	man, err := manager.New(&manager.Config{
+		RailwayEnvironmentID: cfg.Railway.EnvironmentID,
+		RailwayToken:         cfg.Railway.Token,
+		MetricInterval:       cfg.MetricInterval,
+		ScaleInterval:        cfg.ScaleInterval,
+	})
 	if err != nil {
-		return fmt.Errorf("failed to initialize monitor manager: %w", err)
+		return fmt.Errorf("failed to initialize manager: %w", err)
 	}
 
-	monitors, err := newMonitors(cfg)
+	scalers, err := newScalers(cfg)
 	if err != nil {
-		return fmt.Errorf("failed to initialize monitors: %w", err)
+		return fmt.Errorf("failed to initialize scalers: %w", err)
+	}
+	defer scalers.close()
+
+	if err := man.Register(ctx, cfg.Railway.ServiceRAG, scalers.rag); err != nil {
+		return fmt.Errorf("failed to register RAG scaler: %w", err)
 	}
 
-	controllers, err := newControllers(cfg)
-	if err != nil {
-		return fmt.Errorf("failed to initialize monitors: %w", err)
-	}
+	go man.Run(ctx)
 
-	manager.Register(cfg.Railway.ServiceRAG, monitors.Temporal, controllers.rag)
-	manager.Register(cfg.Railway.ServiceAPI, monitors.Mock, controllers.api)
-	manager.Register(cfg.Railway.ServiceApp, monitors.Mock, controllers.app)
-
-	go manager.Run(ctx)
-
-	slog.Info("Manager started", slog.String("interval", cfg.Interval.String()))
+	slog.Info("Manager started",
+		slog.Group("interval",
+			slog.String("metric", cfg.MetricInterval.String()),
+			slog.String("scale", cfg.ScaleInterval.String()),
+		),
+	)
 
 	<-ctx.Done()
 	stop()
@@ -66,7 +72,7 @@ func run() error {
 func init() {
 	lg := slog.New(
 		tint.NewHandler(os.Stdout, &tint.Options{
-			Level:      slog.LevelInfo,
+			Level:      slog.LevelDebug,
 			NoColor:    !isatty.IsTerminal(os.Stdout.Fd()),
 			TimeFormat: time.Kitchen,
 		}),
