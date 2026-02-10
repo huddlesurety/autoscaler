@@ -119,8 +119,6 @@ func (man *Manager) onTick(ctx context.Context, tickID int) {
 			attrReplicasBefore := slog.Int("before", before.Replicas)
 			attrReplicasAfter := slog.Int("after", after.Replicas)
 
-			fmt.Println(after.LatestDeployment.Status)
-
 			slog.Info("Scaled successfully",
 				attrService,
 				attrMonitor,
