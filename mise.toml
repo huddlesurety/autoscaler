@@ -3,12 +3,12 @@ _.file = [".env.json", ".env.local"]
 ENVIRONMENT = { required = "\"production\" | \"staging\"" }
 
 [tools]
-"go" = "1.25.5"
+go = "1.25.7"
 "github:railwayapp/cli" = "latest"
 "aqua:mvdan/gofumpt" = "latest"
 "aqua:golangci/golangci-lint" = "latest"
 "aqua:jqlang/jq" = "latest"
-"go:github.com/thdxg/logfmt" = "latest"
+"go:github.com/thdxg/logfmt" = "v0.3.0"
 
 # --- tasks ---
 [tasks.run]
