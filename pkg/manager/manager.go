@@ -66,14 +66,14 @@ func (man *Manager) Register(ctx context.Context, serviceID string, s scaler.Sca
 // Runs the manager loop until the context is canceled. Executes the registered scalers based on the configured interval.
 func (man *Manager) Run(ctx context.Context) {
 	metricTicker := time.NewTicker(man.cfg.MetricInterval)
-	scaleticker := time.NewTicker(man.cfg.ScaleInterval)
+	scaleTicker := time.NewTicker(man.cfg.ScaleInterval)
 
 loop:
 	for {
 		select {
 		case <-metricTicker.C:
 			man.onTickMetric(ctx)
-		case <-scaleticker.C:
+		case <-scaleTicker.C:
 			man.onTickScale(ctx)
 		case <-ctx.Done():
 			slog.Info("Manager stopping")
@@ -85,6 +85,7 @@ loop:
 func (man *Manager) onTickMetric(ctx context.Context) {
 	var success atomic.Int64
 	ctx, cancel := context.WithTimeout(ctx, man.cfg.MetricInterval)
+	defer cancel()
 
 	var wg sync.WaitGroup
 	for _, p := range man.pairs {
@@ -116,13 +117,12 @@ func (man *Manager) onTickMetric(ctx context.Context) {
 		slog.Int64("success", success.Load()),
 		slog.Int("total", len(man.pairs)),
 	)
-
-	cancel()
 }
 
 func (man Manager) onTickScale(ctx context.Context) {
 	var success atomic.Int64
 	ctx, cancel := context.WithTimeout(ctx, man.cfg.ScaleInterval)
+	defer cancel()
 
 	var wg sync.WaitGroup
 	for _, p := range man.pairs {
@@ -180,6 +180,4 @@ func (man Manager) onTickScale(ctx context.Context) {
 		slog.Int64("success", success.Load()),
 		slog.Int("total", len(man.pairs)),
 	)
-
-	cancel()
 }

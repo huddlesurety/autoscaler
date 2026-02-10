@@ -5,12 +5,28 @@ ENVIRONMENT = { required = "\"production\" | \"staging\"" }
 [tools]
 "go" = "1.25.5"
 "github:railwayapp/cli" = "latest"
+"aqua:mvdan/gofumpt" = "latest"
+"aqua:golangci/golangci-lint" = "latest"
 
 # --- tasks ---
 [tasks.run]
 description = "Run the API server"
 run = """
   go run ./cmd/autoscaler
+"""
+
+[tasks.fmt]
+description = "Format Go with gofumpt"
+sources = ["**/*.go"]
+run = """
+  gofumpt -l -w .
+"""
+
+[tasks.lint]
+description = "Lint Go with golangci-lint"
+sources = ["**/*.go"]
+run = """
+  golangci-lint run
 """
 
 [tasks.env]
