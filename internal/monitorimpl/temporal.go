@@ -29,7 +29,7 @@ func NewTemporalMonitor(cfg *config.Config) (monitor.Monitor, error) {
 	}
 
 	return &Temporal{
-		name:   "Temporal Monitor",
+		name:   "Temporal",
 		client: c,
 	}, nil
 }

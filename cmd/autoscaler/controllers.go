@@ -18,7 +18,7 @@ func newControllers(cfg *config.Config) (*controllers, error) {
 
 func (c *controllers) rag(ctx context.Context, metric int) (int, error) {
 	// TODO
-	return 1, nil
+	return 0, nil
 }
 
 func (c *controllers) api(ctx context.Context, metric int) (int, error) {

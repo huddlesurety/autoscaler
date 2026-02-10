@@ -56,71 +56,88 @@ loop:
 	for {
 		select {
 		case <-ticker.C:
-			success := 0
-			ctx, cancel := context.WithTimeout(ctx, man.cfg.Interval)
-
-			var wg sync.WaitGroup
-			for _, s := range man.scalers {
-				svc, err := man.railway.GetService(ctx, s.serviceID)
-				if err != nil {
-					slog.Error("Failed to get service", slog.Any("error", err))
-					continue
-				}
-
-				attrService := slog.String("service", svc.Name)
-				attrMonitor := slog.String("monitor", s.monitor.Name())
-
-				wg.Go(func() {
-					metric, err := s.monitor.OnTick(ctx, tickID)
-					if err != nil {
-						slog.Error("Failed to retrieve metric",
-							attrService,
-							attrMonitor,
-							slog.Any("error", err),
-						)
-						return
-					}
-
-					replicas, err := s.control(ctx, metric)
-					if err != nil {
-						slog.Error("Failed to get desired replicas",
-							attrService,
-							attrMonitor,
-							slog.Any("error", err),
-						)
-						return
-					}
-
-					if err := man.railway.Scale(ctx, s.serviceID, replicas); err != nil {
-						slog.Error("Failed to scale",
-							attrService,
-							attrMonitor,
-							slog.Any("error", err),
-						)
-						return
-					}
-
-					slog.Info("Scaled successfully",
-						attrService,
-						attrMonitor,
-						slog.Int("replicas", replicas),
-					)
-				})
-				success++
-			}
-
-			wg.Wait()
-
+			man.onTick(ctx, tickID)
 			tickID++
-			slog.Info("Tick",
-				slog.Int("id", tickID),
-				slog.Int("success", success),
-				slog.Int("failure", len(man.scalers)-success),
-			)
-			cancel()
 		case <-ctx.Done():
 			slog.Info("Manager stopping")
 			break loop
 		}
 	}
+}
+
+func (man *Manager) onTick(ctx context.Context, tickID int) {
+	success := 0
+	ctx, cancel := context.WithTimeout(ctx, man.cfg.Interval)
+
+	var wg sync.WaitGroup
+	for _, s := range man.scalers {
+		wg.Go(func() {
+			before, err := man.railway.GetService(ctx, s.serviceID)
+			if err != nil {
+				slog.Error("Failed to get service", slog.Any("error", err))
+				return
+			}
+
+			attrService := slog.String("service", before.Name)
+			attrMonitor := slog.String("monitor", s.monitor.Name())
+
+			metric, err := s.monitor.OnTick(ctx, tickID)
+			if err != nil {
+				slog.Error("Failed to retrieve metric",
+					attrService,
+					attrMonitor,
+					slog.Any("error", err),
+				)
+				return
+			}
+
+			desired, err := s.control(ctx, metric)
+			if err != nil {
+				slog.Error("Failed to get desired replicas",
+					attrService,
+					attrMonitor,
+					slog.Any("error", err),
+				)
+				return
+			}
+
+			if err := man.railway.Scale(ctx, s.serviceID, desired); err != nil {
+				slog.Error("Failed to scale",
+					attrService,
+					attrMonitor,
+					slog.Any("error", err),
+				)
+				return
+			}
+
+			after, err := man.railway.GetService(ctx, s.serviceID)
+			if err != nil {
+				slog.Error("Failed to get service", slog.Any("error", err))
+				return
+			}
+
+			attrReplicasBefore := slog.Int("before", before.Replicas)
+			attrReplicasAfter := slog.Int("after", after.Replicas)
+
+			fmt.Println(after.LatestDeployment.Status)
+
+			slog.Info("Scaled successfully",
+				attrService,
+				attrMonitor,
+				attrReplicasBefore,
+				attrReplicasAfter,
+				slog.Int("desired", desired),
+			)
+		})
+		success++
+	}
+
+	wg.Wait()
+
+	slog.Info("Tick",
+		slog.Int("id", tickID),
+		slog.Int("success", success),
+		slog.Int("failure", len(man.scalers)-success),
+	)
+	cancel()
 }

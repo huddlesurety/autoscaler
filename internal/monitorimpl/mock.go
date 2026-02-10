@@ -13,7 +13,7 @@ type Mock struct {
 
 func NewMockMonitor(cfg *config.Config) (monitor.Monitor, error) {
 	return &Mock{
-		name: "Mock Monitor",
+		name: "Mock",
 	}, nil
 }
 
